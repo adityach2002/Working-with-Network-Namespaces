@@ -140,7 +140,7 @@ TCP window size: 85.0 KByte (default)
 [  3]  0.0-10.0 sec  2.05 GBytes  1.76 Gbits/sec
 root@parikshit-Lenovo-ideapad-330-15IKB:/home/parikshit# iperf -c 10.0.0.1
 	
-
+===============================================================================================================================
 
 
 
