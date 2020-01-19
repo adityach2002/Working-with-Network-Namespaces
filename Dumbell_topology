@@ -1,0 +1,147 @@
+Objective:
+Create a Dumbell Topology to test Congestion and Queue Management Algorithms.
+-------------------------------------------------------------------------------------------------------------------------------
+#sudo su
+
+1) Create 6 namespaces , 2 sources, 2 intermediate router and 2 Destinations.
+-------------------------------------------------------------------------------------------------------------------------------
+# ip netns add source_1
+# ip netns add source_2
+# ip netns add dest_1
+# ip netns add dest_2
+# ip netns add router_1
+# ip netns add router_2
+
+2) Create links between (source1,router1) and (source2,router1). Connect respective interfaces to the respective namespaces.
+-------------------------------------------------------------------------------------------------------------------------------
+# ip link add source_eth_1 type veth peer name router_eth_1_1
+# ip link add source_eth_2 type veth peer name router_eth_1_2
+# ip link set source_eth_1 netns source_1
+# ip link set source_eth_2 netns source_2
+# ip link set router_eth_1_1 netns router_1
+# ip link set router_eth_1_2 netns router_1
+
+3) Add link between two routers and connect the interfaces respectively.
+-------------------------------------------------------------------------------------------------------------------------------
+# ip link add router_eth_1_3 type veth peer name router_eth_2_1
+# ip link set router_eth_1_3 netns router_1
+# ip link set router_eth_2_1 netns router_2
+
+4) Create links between (dest1,router2) and (dest2,router2). Connect respective interfaces to the respective namespaces.
+-------------------------------------------------------------------------------------------------------------------------------
+# ip link add router_eth_2_2 type veth peer name dest_eth_1
+# ip link add router_eth_2_3 type veth peer name dest_eth_2
+# ip link set router_eth_2_2 netns router_2
+# ip link set router_eth_2_3 netns router_2
+# ip link set dest_eth_1 netns dest_1
+# ip link set dest_eth_2 netns dest_2
+
+5)Set loopback addresses and interfaces UP
+-------------------------------------------------------------------------------------------------------------------------------
+# ip netns exec source_1 ip link set lo up
+# ip netns exec source_1 ip link set source_eth_1 up
+# ip netns exec source_2 ip link set lo up
+# ip netns exec source_2 ip link set source_eth_2 up
+
+# ip netns exec router_1 ip link set lo up
+# ip netns exec router_1 ip link set router_eth_1_1 up
+# ip netns exec router_1 ip link set router_eth_1_2 up
+# ip netns exec router_1 ip link set router_eth_1_3 up
+
+# ip netns exec router_2 ip link set lo up
+# ip netns exec router_2 ip link set router_eth_2_1 up
+# ip netns exec router_2 ip link set router_eth_2_2 up
+# ip netns exec router_2 ip link set router_eth_2_3 up
+
+# ip netns exec dest_1 ip link set lo up
+# ip netns exec dest_1 ip link set dest_eth_1 up
+# ip netns exec dest_2 ip link set lo up
+# ip netns exec dest_2 ip link set dest_eth_2
+
+6) Assign IP addresses to all the interfaces
+-------------------------------------------------------------------------------------------------------------------------------
+# ip netns exec source_1 ip address add 10.0.0.1/24 dev source_eth_1
+# ip netns exec source_2 ip address add 10.0.0.2/24 dev source_eth_2
+
+# ip netns exec router_1 ip address add 10.0.0.3/24 dev router_eth_1_1
+# ip netns exec router_1 ip address add 10.0.0.4/24 dev router_eth_1_2
+# ip netns exec router_1 ip address add 10.0.0.5/24 dev router_eth_1_3
+
+# ip netns exec router_2 ip address add 10.0.0.6/24 dev router_eth_2_1
+# ip netns exec router_2 ip address add 10.0.0.7/24 dev router_eth_2_2
+# ip netns exec router_2 ip address add 10.0.0.8/24 dev router_eth_2_3
+
+# ip netns exec dest_1 ip address add 10.0.0.9/24 dev dest_eth_1
+# ip netns exec dest_2 ip address add 10.0.0.10/24 dev dest_eth_2
+
+7) Set bandwidth of 1GB/s between sources to router and 100MB/s between two routers(Bottleneck B/W)
+-------------------------------------------------------------------------------------------------------------------------------
+# ip netns exec source_1 bash
+# tc qdisc del dev source_eth_1 root
+# tc qdisc add dev source_eth_1 root tbf rate 1024kbit latency 2ms burst 1540
+# exit
+
+# ip netns exec source_2 bash
+# tc qdisc del dev source_eth_2 root
+# tc qdisc add dev source_eth_2 root tbf rate 1024kbit latency 2ms burst 1540
+# exit
+
+# ip netns exec router_1 bash
+# tc qdisc del dev router_eth_1_3 root
+# tc qdisc add dev router_eth_1_3 root tbf rate 100mbit latency 50ms burst 1540
+# exit
+
+# ip netns exec router_2 bash
+# tc qdisc del dev router_eth_2_2 root
+# tc qdisc add dev router_eth_2_2 root tbf rate 1024kbit latency 2ms burst 1540
+# exit
+
+# ip netns exec router_2 bash
+# tc qdisc del dev router_eth_2_3 root
+# tc qdisc add dev router_eth_2_3 root tbf rate 1024kbit latency 2ms burst 1540
+# exit
+
+8) Make source_1 as server and Router_1 client and generate traffic using iperf
+-------------------------------------------------------------------------------------------------------------------------------
+On terminal 1)
+# ip netns exec source_1 bash
+# iperf -s
+
+On terminal 2)
+# ip netns exec router_1 bash
+# iperf -c 10.0.0.1
+
+===============================================================================================================================    	
+
+TERMINAL 1)
+
+root@parikshit-Lenovo-ideapad-330-15IKB:/home/parikshit# ip netns exec source_1 bash	
+root@parikshit-Lenovo-ideapad-330-15IKB:/home/parikshit# iperf -s
+------------------------------------------------------------
+Server listening on TCP port 5001
+TCP window size:  128 KByte (default)
+------------------------------------------------------------
+[  4] local 10.0.0.1 port 5001 connected with 10.0.0.3 port 48408
+[ ID] Interval       Transfer     Bandwidth
+[  4]  0.0-10.0 sec  2.05 GBytes  1.76 Gbits/sec
+
+-----------------------------------------------------------
+
+TERNINAL 2)
+
+root@parikshit-Lenovo-ideapad-330-15IKB:/home/parikshit# ip netns exec router_1 bash
+root@parikshit-Lenovo-ideapad-330-15IKB:/home/parikshit# iperf -c 10.0.0.1
+
+Client connecting to 10.0.0.1, TCP port 5001
+TCP window size: 85.0 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.3 port 48408 connected with 10.0.0.1 port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-10.0 sec  2.05 GBytes  1.76 Gbits/sec
+root@parikshit-Lenovo-ideapad-330-15IKB:/home/parikshit# iperf -c 10.0.0.1
+	
+
+
+
+
+
